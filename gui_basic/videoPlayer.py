@@ -1,3 +1,5 @@
+import mailcap
+
 import cv2
 from PySide2.QtGui import QPixmap, QImage
 import sys
@@ -39,7 +41,6 @@ class VideoWindow(QMainWindow):
 
         self.frame_timer = QTimer()
         self.frame_timer.timeout.connect(self.videostart)
-        self.frame_timer.timeout.connect(self.positionChanged)
 
         self.positionSlider = QSlider(Qt.Horizontal)
         self.positionSlider.setRange(0, 0)
@@ -51,6 +52,7 @@ class VideoWindow(QMainWindow):
 
         self.cap = cv2.VideoCapture()
         self.fps = 30
+        self.step = 0
         self.pause = False
 
         # Create new action
@@ -129,22 +131,23 @@ class VideoWindow(QMainWindow):
     def Save(self):
         pass
     def videostart(self):
-        ret, frame = self.cap.read()
-
-        if not ret:
-            return False
+        if self.step >= self.cap.get(cv2.CAP_PROP_FRAME_COUNT):
+            return
+        frame = self.video_array[self.step]
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         image = qimage2ndarray.array2qimage(frame)
+
         self.imageLabel.setPixmap(QPixmap.fromImage(image))
+        self.step += 1
+        self.positionSlider.setValue(self.step)
 
     def openModel(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Movie",
                                                   QDir.homePath())
         if fileName != '':
             self.listImage.addItem(fileName)
-
 
     def openFile(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Movie",
@@ -155,6 +158,16 @@ class VideoWindow(QMainWindow):
             self.setWindowTitle(fileName.split('/')[-1])
             self.cap.open(fileName)
             self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+            self.hallframecount = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            self.positionSlider.setMaximum(self.hallframecount)
+            self.video_array = []
+
+            i = 0
+            while i <= self.cap.get(cv2.CAP_PROP_FRAME_COUNT):
+                ret, frame = self.cap.read()
+                self.video_array.append(frame)
+                i += 1
+
 
     def exitCall(self):
         sys.exit(app.exec_())
@@ -183,7 +196,7 @@ class VideoWindow(QMainWindow):
         self.positionSlider.setRange(0, duration)
 
     def setPosition(self, position):
-        self.positionSlider.setPosition(position)
+        self.step = position
 
     def handleError(self):
         self.playButton.setEnabled(False)
